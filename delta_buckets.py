@@ -28,3 +28,35 @@ def create_feature_delta_buckets_pipeline(data, first, count, name = 'none', whi
     final = augment_df(group_sum_df)
     
     return final
+
+def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'asks', bucket_size = 2, column = 'asks_price'):
+    
+    import pandas as pd
+    
+    delta_bucket_feature_vector = create_feature_delta_buckets_pipeline(data = data,
+                                                                        first = first,
+                                                                        count = count,
+                                                                        name = name,
+                                                                        which = which,
+                                                                        bucket_size = bucket_size,
+                                                                        column = column)
+    
+    for i in range(len(data)-2):
+        df_temp = create_feature_delta_buckets_pipeline(data = data,
+                                                        first = first+i,
+                                                        count = count,
+                                                        name = name,
+                                                        which = which,
+                                                        bucket_size = bucket_size,
+                                                        column = column)
+        delta_bucket_feature_vector = pd.concat([delta_bucket_feature_vector,
+                                                 df_temp], sort = False)
+        
+    delta_bucket_feature_vector.reset_index(inplace = True)
+    delta_bucket_feature_vector.drop("index",
+                                     axis = 1,
+                                     inplace = True)
+    
+    delta_bucket_feature_vector.fillna(0, inplace = True)
+    
+    return delta_bucket_feature_vector
