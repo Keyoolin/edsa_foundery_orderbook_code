@@ -2,12 +2,18 @@ def initialise_dataframes(files, directory):
     
     """
     
-    Parameters:
-        files (list): A list of strings containing the names for the csv's to be read into dataframes.
-        directory (str): The string containing the directory all the csv's are stored.
+    Parameters
+    ----------
+        files : list, required
+        A list of strings containing the names for the csv's to be read into dataframes.
         
-    Returns:
-        data (list): A list of dataframes
+        directory : str, required
+        The string containing the directory all the csv's are stored.
+        
+    Returns
+    ----------
+        data : list
+        A list of dataframes
         
     Example:
         initialise_dataframes(["a.csv", "b.csv", "c.csv"], "/home/")

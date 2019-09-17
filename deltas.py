@@ -1,14 +1,27 @@
 def merge_data(data_1, data_2, on, ascending = True):
     
-     """
-    Parameters:
-        data_1 (dataframe): First dataframe to merge on
-        data_2 (dataframe): Second dataframe to merge on
-        on (str): The name of the column to merge on. Column need to be present in both dataframes
-        ascending (bool): True or False. Ascending or descending order of the dataframe.
+    """
+    Function to do a simple merge of the two dataframes inputted.
+    
+    Parameters
+    ----------
+        data_1 : Dataframe, required
+        First Dataframe to merge on
         
-    Returns:
-        df (dataframe): An outer merged dataframe with null values being filled with 0 values
+        data_2 : Dataframe, required
+        Second dataframe to merge on
+        
+        on : str, required
+        The name of the column to merge on. 
+        Column need to be present in both dataframes
+        
+        ascending : boolean, optional, default True
+        Ascending or descending order of the dataframe.
+        
+    Returns
+    ----------
+        df : dataframe
+        An outer merged dataframe with null values being filled with 0 values
         
     """
     
@@ -21,112 +34,175 @@ def merge_data(data_1, data_2, on, ascending = True):
 def time_delta(data_1, data_2):
     return data_2.iloc[1].timestamp - data_1.iloc[1].timestamp
 
-def clean_data(data, which, volume_column = 'volume'):
-    if which == 'asks':
-        return data.drop(['asks_{}_t0'.format(volume_column), 'asks_{}_t1'.format(volume_column)], axis = 1)
-    elif which == 'bids':
-        return data.drop(['bids_{}_t0'.format(volume_column), 'bids_{}_t1'.format(volume_column)], axis = 1)
+def clean_data(data, which = 'asks', volume_column = 'volume'):
+
+    """
     
-def calculate_deltas(data_1, data_2, which = 'both', name = 'time_format', columns = ['price', 'volume']):
+    clean_data removes the unneeded volume columns after the merge. 
+    The volume columns provides a means of calculating the deltas,
+    however post calculation, it's not needed.
     
-    def column_names(which, columns):
+    Parameters
+    ----------
+        data : Pandas dataframe, required
+        Dataframe to clean
+        
+        which : str, "bids" | "asks", optional, default = "asks"
+        Accepts "bids" or "asks" as which column to clean.
+        
+        volume_column : str, optional, default = "volume"
+        Naming convention of the volume column. 
+        "bids_volume" vs "bids_quantity", etc.
+        
+    Returns
+    ----------
+        df : dataframe
+        An cleaned dataframe with t0 and t1 volume columns deleted.
+        
+    """
+
+    return data.drop(['{}_{}_t0'.format(which, volume_column), '{}_{}_t1'.format(which, volume_column)], axis = 1)
+    
+def column_names(which, columns):
         price_column = "{}_{}".format(which, columns[0]) 
         volume_column = "{}_{}".format(which, columns[1])
         
         return price_column, volume_column
-         
     
-    if which == 'asks' or which == 'both':
-        asks_price_column, asks_volume_column = column_names("asks", columns)
-        
-        asks_data_1 = data_1[[asks_price_column, asks_volume_column]]
-        asks_data_2 = data_2[[asks_price_column, asks_volume_column]]
-        
-        merged_asks = merge_data(asks_data_1, asks_data_2, on = asks_price_column)
-        merged_asks.columns = [asks_price_column, '{}_t0'.format(asks_volume_column), '{}_t1'.format(asks_volume_column)]
-        
-        store = merged_asks['{}_t1'.format(asks_volume_column)] - merged_asks['{}_t0'.format(asks_volume_column)]
-        
-        if name == 'time_format':
-            merged_asks['delta_asks_{}'.format(time_delta(data_1, data_2))] = store
-        elif name == 'none': 
-            merged_asks['delta_asks'] = store
-        
-    if which == 'bids' or which == 'both':
-        bids_price_column, bids_volume_column = column_names("bids", columns)
-        
-        bids_data_1 = data_1[[bids_price_column, bids_volume_column]]
-        bids_data_2 = data_2[[bids_price_column, bids_volume_column]]
-        
-        merged_bids = merge_data(bids_data_1, bids_data_2, on = bids_price_column, ascending = False)
-        merged_bids.columns = [bids_price_column, "{}_t0".format(bids_volume_column) , "{}_t1".format(bids_volume_column)]
-        
-        store = merged_bids["{}_t1".format(bids_volume_column)] - merged_bids["{}_t0".format(bids_volume_column)]
-        
-        if name == 'time_format':
-            merged_bids['delta_bids_{}'.format(time_delta(data_1, data_2))] = store
-        elif name == 'none': 
-            merged_bids['delta_bids'] = store    
+def calculate_deltas(snapshot_1, snapshot_2, which, name = 'time_format', columns = ['price', 'volume']):
+
+    """
+    calculate_deltas calculates the change in volume between two snapshots
     
-    if which == 'both':
-        return merged_bids, merged_asks
-    elif which == 'asks':
-        return merged_asks
-    elif which == 'bids':
-        return merged_bids
+    Parameters
+    ----------
+        snapshot_1 : dataframe, required
+        Snapshot orderbook data at time T0
+        
+        snapshot_2 : Dataframe, required
+        Snapshot orderbook data at time T0
+        
+        which : str, "bids" | "asks" , required
+        Which deltas to calculate, bids or asks
+        
+        name : str, "none" | "time_format", optional, default = "time_format"
+        Selects the naming format of the returned delta column. 
+        Time_format calculates the time difference and appends it to the column name.
+        None names it a delta column.
+        
+        columns : list, optional, default = ['price', 'volume']
+        Naming convention of the price and volume column. 
+        "bids_volume" vs "bids_quantity", etc.
+        column names must be in the format "{1}_{2}", where 1 is the which parameter
+        and 2 is the column name parameter.
+        
+        
+    Returns
+    ----------
+        merged_bids : Dataframe 
+        Dataframe of deltas between snapshot_1 and snapshot_2.
+        The dataframe returned would either be of bids or of asks.
+            
+    """
+            
+    price_column, volume_column = column_names(which, columns)
     
+    data_1 = snapshot_1[[price_column, volume_column]]
+    data_2 = snapshot_2[[price_column, volume_column]]
+    
+    if which == "bids":
+        ascending = False
+    elif which == "asks":
+        ascending = True
+        
+    merged_data = merge_data(data_1, data_2, on = price_column, ascending = ascending)
+    merged_data.columns = [price_column, "{}_t0".format(volume_column) , "{}_t1".format(volume_column)]
+    
+    store = merged_data["{}_t1".format(volume_column)] - merged_data["{}_t0".format(volume_column)]
+    
+    if name == 'time_format':
+        merged_data['delta_{}_{}'.format(which, time_delta(snapshot_1, snapshot_2))] = store
+    elif name == 'none': 
+        merged_data['delta_{}'.format(which)] = store    
+    
+    return merged_data
+
+def calculate_multiple_deltas(data, first, count, which, name = 'time_format', columns = ['price', 'volume']):
 
 
-def calculate_multiple_deltas(data, first, count, which = 'both', name = 'time_format', columns = ['price', 'volume']):
+    """
+    Calculates the change in volume between multiple snapshots
     
-    if type(data) != list:
-        raise TypeError("Input data needs to be of type list")
-            
-    if type(first) != int:
-        raise TypeError("Input first needs to be of type int")
-            
+    Parameters
+    ----------
+    
+        data : list, required
+        List of snapshots saved as dataframes
+        
+        first : int, required
+        The initial start point in the list of snapshots for which to calculate deltas
+        
+        count : int, list or tuple, required
+        How many snapshots in the future should the delta's be calculated for?
+        if list is used, calculates multiple deltas. e.g. between t0 and t2, and t0 and t3
+        
+        which : str, "asks" | "bids", required
+        Which deltas to calculate, bids or asks
+        
+        name : str, "none" | "time_format", optional, default = 'time_format'
+        Selects the naming format of the returned delta column. 
+        Time_format calculates the time difference and appends it to the column name.
+        None names it a delta column.
+        
+        columns : list, optional, default = ['price', 'volume'] 
+        Naming convention of the price and volume column.
+        Column names must be in the format "{1}_{2}", where 1 is the which parameter
+        and 2 is the column name parameter.
+        
+        
+    Returns
+    ----------
+        deltas_df : Dataframe
+        Dataframe of delta values between snapshots
+        
+    """
+    
+    if type(data) != list or type(first) != int:
+        raise TypeError("Incorrect type format of input data")
+           
+
     if type(count) == list or type(count) == tuple:
         if max(count) > (len(data) - first - 1):
             raise ValueError("Not enough data to calculate delta's. Shorten t1 request")
-    elif count > (len(data) - first - 1):
-        raise ValueError("Not enough data to calculate delta's. Shorten t1 request")
-
-    if type(count) == list or type(count) == tuple:
+            
         counter = 0
         for i in count:
-            if which == 'both':
-                bids, asks = calculate_deltas(data[first],
+
+            deltas = calculate_deltas(data[first],
                                               data[first+i],
                                               which = which,
                                               name = name,
-                                              columns = ['price', 'volume'])
+                                              columns = columns)
+                
+            if which == 'bids':
+                ascending = False
             elif which == 'asks':
-                asks = calculate_deltas(data[first],
-                                              data[first+i],
-                                              which = which,
-                                              name = name,
-                                              columns = ['price', 'volume'])
-            elif which == 'bids':
-                bids = calculate_deltas(data[first],
-                                              data[first+i],
-                                              which = which,
-                                              name = name,
-                                              columns = ['price', 'volume'])
+                ascending = True
+
+            price_column, volume_column = column_names(which, columns)
+
+            if counter == 0:
+                deltas_df = deltas.drop('{}_t1'.format(volume_column), axis = 1)
+            else:
+                deltas_df = clean_data(deltas_df,
+                                       clean_data(deltas, which),
+                                       on = price_column,
+                                       ascending = ascending)
                 
-            if which == 'both' or which == 'bids':
-                bids_price_column, bids_volume_column = column_names("bids", columns)
-                if counter == 0:
-                    bids_df = bids.drop('{}_t1'.format(bids_volume_column), axis = 1)
-                else:
-                    bids_df = clean_data(bids_df, clean_data(bids, 'bids'), on = bids_price_column, ascending = False)
-                
-            if which == 'both' or which == 'asks':
-                asks_price_column, asks_volume_column = column_names("asks", columns)
-                if counter == 0:
-                    asks_df = asks.drop('{}_t1'.format(asks_volume_column), axis = 1)
-                else:
-                    asks_df = clean_data(asks_df, clean_data(asks, 'asks'), on = asks_price_column)
             counter = counter + 1
-        return bids_df, asks_df
+        return deltas_df
+        
+    elif count > (len(data) - first - 1):
+        raise ValueError("Not enough data to calculate delta's. Shorten t1 request")
     else:
-        return calculate_deltas(data[first], data[first+count], which = which, name = name, columns = ['price', 'volume'])
+        return calculate_deltas(data[first], data[first+count], which = which, name = name, columns = columns)

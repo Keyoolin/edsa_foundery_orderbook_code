@@ -1,25 +1,41 @@
-def calculate_bucket_end_points(data, bucket_size, which = 'bids', column = 'bids_price'):
+def calculate_bucket_end_points(snapshot, bucket_size, which = 'bids', column = ['price', 'volume']):
 
 	"""
-	data: of type dataframe
+    Calculated the bucket end points for a given snapshot based on the price and the bucket_size
+    
+    Parameters
+    ----------
+	snapshot : dataframe, required
+    The snapshot for which buckets should be calculated
 	
-	bucket_size: of type integer
+	bucket_size : int, required
+    The dollar size of the bucket
 	
-	which: of type string. either 'bids' or 'asks'
+	which : str, "asks" | "bids", optional, default = 'bids'
+    Which deltas to calculate, bids or asks
 	
-	column: of type string. 
+	column : list, optional, default = ['price', 'volume'] 
+    Naming convention of the price and volume column.
+    Column names must be in the format "{1}_{2}", where 1 is the which parameter
+    and 2 is the column name parameter. 
 	
-	returns:
+	Returns
+    ----------
 	list of integer values representing bucket end points
 	
-	example:
-	calculate_bucket_end_points(data = df, bucket_size = 5, which = 'bids', column = 'bids_price') = [100, 105, 110]
+	Example
+    ----------
+	calculate_bucket_end_points(snapshot = df, bucket_size = 5, which = 'bids', column = 'bids_price') = [100, 105, 110]
 	
 	"""
-	import numpy as np
     
-	max_val = data[column].max()
-	min_val = data[column].min()
+	import numpy as np
+    from deltas import column_names
+    
+    price_column, volume_column = column_names(which, columns)
+    
+	max_val = snapshot[price_column].max()
+	min_val = snapshot[price_column].min()
     
 	if which == 'bids':
 		return np.arange(max_val, min_val, (-1*bucket_size))
@@ -29,16 +45,25 @@ def calculate_bucket_end_points(data, bucket_size, which = 'bids', column = 'bid
 def fill_data_into_buckets(data_point, bucket_end_points, which = 'bids'):
 
 	"""
-	data_point: of type integer
+    Categorises a data point based on which bucket it falls into as per the bucket end points
+    
+    Parameters
+    ----------
+	data_point : int, required
+    The data_point to be filled into buckets
 	
-	bucket_end_points: of type list of integers
+	bucket_end_points : list, required
+    List of integers representing the bucket end values
 	
-	which: of type string. either 'bids' or 'asks'
+	which : str, "asks" | "bids", optional, default = 'bids'
+    Which deltas to calculate, bids or asks
 	
-	returns:
+	Returns
+    ---------
 	An integer value stating which bucket the datapoint falls into based on the inputed bucket end points
 	
-	example:
+	Example
+    ---------
 	fill_data_into_buckets(data_point = 100, bucket_end_points = [108, 103, 98], which = 'bids') = 1
 	
 	"""
@@ -55,27 +80,41 @@ def fill_data_into_buckets(data_point, bucket_end_points, which = 'bids'):
 			return i
     
         
-def create_buckets(data, bucket_size, which = 'bids', column = 'bids_price'):
+def create_buckets(snapshot, bucket_size, which = 'bids', column = ['price', 'volume']):
 
 	"""
-	data: of type dataframe
+    Pipeline function to create buckets and fill data into the buckets
+    
+    Parameters
+    ----------
+	snapshot : Dataframe, required
+    The snapshot for which buckets must be created
 	
-	bucket_size: of type integer
+	bucket_size : int, required
+    The dollar size of the bucket
 	
-	which: of type string. either 'bids' or 'asks'
+	which : str, "asks" | "bids", optional, default = 'bids'
+    Which deltas to calculate, bids or asks
 	
-	column: of type string. 
+	column : list, optional, default = ['price', 'volume'] 
+    Naming convention of the price and volume column.
+    Column names must be in the format "{1}_{2}", where 1 is the which parameter
+    and 2 is the column name parameter.  
 	
-	returns:
-	dataframe with a new column representing each row value in column according to which bucket it falls in.
+	Returns
+    ----------
+	Dataframe with a new column representing each row value in column according to which bucket it falls in.
 	
-	example:
-	calculate_bucket_end_points(data = df, bucket_size = 5, which = 'bids', column = 'bids_price')
+	Example
+    ----------
+	calculate_bucket_end_points(snapshot = df, bucket_size = 5, which = 'bids', column = 'bids_price')
 	
 	"""
+    from deltas import column_names
+    price_column, volume_column = column_names(which, columns)
     
-	bucket_end_points = calculate_bucket_end_points(data, bucket_size, which = which, column = column)
+	bucket_end_points = calculate_bucket_end_points(snapshot, bucket_size, which = which, column = price_column)
     
-	data["{}_bucket".format(which)] = data[column].apply(fill_data_into_buckets, args = [bucket_end_points, which])
+	snapshot["{}_bucket".format(which)] = snapshot[price_column].apply(fill_data_into_buckets, args = [bucket_end_points, which])
     
-	return data
+	return snapshot
