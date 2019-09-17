@@ -43,7 +43,7 @@ def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'ask
     
     for i in range(len(data)-2):
         df_temp = create_feature_delta_buckets_pipeline(data = data,
-                                                        first = first+i,
+                                                        first = first+i+1,
                                                         count = count,
                                                         name = name,
                                                         which = which,
