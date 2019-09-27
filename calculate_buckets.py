@@ -1,4 +1,4 @@
-def calculate_bucket_end_points(snapshot, bucket_size, which = 'bids', column = ['price', 'volume']):
+def calculate_bucket_end_points(snapshot, bucket_size, which = 'bids', columns = ['price', 'volume']):
 
 	"""
     Calculated the bucket end points for a given snapshot based on the price and the bucket_size
@@ -30,9 +30,9 @@ def calculate_bucket_end_points(snapshot, bucket_size, which = 'bids', column = 
 	"""
     
 	import numpy as np
-    from deltas import column_names
+	from deltas import column_names
     
-    price_column, volume_column = column_names(which, columns)
+	price_column, volume_column = column_names(which, columns)
     
 	max_val = snapshot[price_column].max()
 	min_val = snapshot[price_column].min()
@@ -80,7 +80,7 @@ def fill_data_into_buckets(data_point, bucket_end_points, which = 'bids'):
 			return i
     
         
-def create_buckets(snapshot, bucket_size, which = 'bids', column = ['price', 'volume']):
+def create_buckets(snapshot, bucket_size, which = 'bids', columns = ['price', 'volume']):
 
 	"""
     Pipeline function to create buckets and fill data into the buckets
@@ -110,10 +110,10 @@ def create_buckets(snapshot, bucket_size, which = 'bids', column = ['price', 'vo
 	calculate_bucket_end_points(snapshot = df, bucket_size = 5, which = 'bids', column = 'bids_price')
 	
 	"""
-    from deltas import column_names
-    price_column, volume_column = column_names(which, columns)
+	from deltas import column_names
+	price_column, volume_column = column_names(which, columns)
     
-	bucket_end_points = calculate_bucket_end_points(snapshot, bucket_size, which = which, column = price_column)
+	bucket_end_points = calculate_bucket_end_points(snapshot, bucket_size, which = which, columns = columns)
     
 	snapshot["{}_bucket".format(which)] = snapshot[price_column].apply(fill_data_into_buckets, args = [bucket_end_points, which])
     

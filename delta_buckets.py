@@ -1,4 +1,4 @@
-def augment_df(data):
+def augment_df(data, first, count):
 
     import pandas as pd
     
@@ -6,17 +6,21 @@ def augment_df(data):
     transposed_df = melted_df.transpose()
     
     column_list = []
-    count = 0
+    counter = 0
     for i in list(transposed_df.loc['variable'].values):
-        column_list.append(i + "_{}".format(count))
-        count = count + 1
+        column_list.append(i + "_{}".format(counter))
+        counter = counter + 1
     transposed_df.columns = column_list
     transposed_df.drop("variable", inplace = True)
+    
+    transposed_df["first"] = first
+    transposed_df["last"] = first+count
+    transposed_df["between"] = '{}_{}'.format(first, (first+count))
     
     return transposed_df
 
 
-def create_feature_delta_buckets_pipeline(data, first, count, name = 'none', which = 'bids', bucket_size = 5, column = ['price', 'volume']):
+def create_feature_delta_buckets_pipeline(data, first, count, name = 'none', which = 'bids', bucket_size = 5, columns = ['price', 'volume']):
 
 
     """
@@ -62,15 +66,15 @@ def create_feature_delta_buckets_pipeline(data, first, count, name = 'none', whi
     from deltas import calculate_multiple_deltas
     from calculate_buckets import create_buckets
     
-    df = calculate_multiple_deltas(data, first, count, which = which, name = name, column = column)
-    bucket_df = create_buckets(df, bucket_size = bucket_size, which = which, column = column)
+    df = calculate_multiple_deltas(data = data, first = first, count = count, which = which, name = name, columns = columns)
+    bucket_df = create_buckets(snapshot = df, bucket_size = bucket_size, which = which, columns = columns)
     grouped_df = bucket_df.groupby('{}_bucket'.format(which))
     group_sum_df = grouped_df.sum()[["delta_{}".format(which)]]
-    final = augment_df(group_sum_df)
+    single_feature_vector = augment_df(group_sum_df, first, count)
     
-    return final
+    return single_feature_vector
 
-def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'asks', bucket_size = 5, column = ['price','volume']):
+def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'asks', bucket_size = 5, columns = ['price','volume']):
 
     """
     Pipeline to calculate deltas between buckets in relative terms over multiple snapshots in time
@@ -120,16 +124,16 @@ def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'ask
                                                                         name = name,
                                                                         which = which,
                                                                         bucket_size = bucket_size,
-                                                                        column = column)
+                                                                        columns = columns)
     
-    for i in range(len(data)-2):
+    for i in range(len(data)-first-2):
         df_temp = create_feature_delta_buckets_pipeline(data = data,
                                                         first = first+i+1,
                                                         count = count,
                                                         name = name,
                                                         which = which,
                                                         bucket_size = bucket_size,
-                                                        column = column)
+                                                        columns = columns)
                                                         
         delta_bucket_feature_vector = pd.concat([delta_bucket_feature_vector,
                                                  df_temp], sort = False)
@@ -139,6 +143,80 @@ def bucket_feature_final(data, first = 0, count = 1, name = 'none', which = 'ask
                                      axis = 1,
                                      inplace = True)
     
+    delta_bucket_feature_vector.set_index('between', inplace=True)
+    
     delta_bucket_feature_vector.fillna(0, inplace = True)
     
     return delta_bucket_feature_vector
+
+def combine_vector(data, first, end):
+    
+    """
+    Takes a dataframe containing multiple row vectors of deltas and 
+    returns a single row vector containing the deltas.
+    
+    Parameters
+    ----------
+    
+        data : DataFrame, required
+        Dataframe containing multiple delta_buckets
+        
+        first : int, required
+        The starting row vector to be combined into a single row vector.
+        All row vectors from this starting vector, 
+        till the end vector will be combined into a single row vector
+
+        end : int, required
+        The ending row vector to be combined into a single row vector.
+        All row vectors before and including this end vector, 
+        from the starting vector will be combined into a single row vector
+        
+    Returns
+    ----------
+        data : Dataframe
+        Dataframe of shape (1, x). Effectively a row vector
+        
+    """
+        
+    data = data[(data['first'] >= first) & (data['last'] <= end)].copy()
+    data.reset_index(inplace = True)
+    data.drop(["first", "last", "between"], axis = 1, inplace = True)
+    data = data.unstack().to_frame().T
+    data.index = ['{}_{}'.format(first, end)]
+
+    return data
+
+def create_delta_feature(data, length):
+    
+    """
+    Takes a dataframe containing multiple row vectors of deltas and 
+    combines them into row vectors of the desired size.
+    
+    Parameters
+    ----------
+    
+        data : DataFrame, required
+        Dataframe containing multiple delta_buckets
+        
+        length : int, required
+        Length of the vectors required. 
+        For example: if 10 deltas are to be considered, input 10.
+        
+    Returns
+    ----------
+        data : Dataframe
+        Dataframe of row vectors containing the required deltas
+        
+    """    
+    
+    i = 0
+    df = combine_vector(data, i, length)
+    
+    while i + length != len(data):
+        i = i + 1
+        df_temp = combine_vector(data, i, length+i)
+        df = pd.concat([df, df_temp], sort = False)
+        
+    df.fillna(0, inplace = True)
+    
+    return df
