@@ -208,6 +208,7 @@ def create_delta_feature(data, length):
         Dataframe of row vectors containing the required deltas
         
     """    
+    import pandas as pd
     
     i = 0
     df = combine_vector(data, i, length)
